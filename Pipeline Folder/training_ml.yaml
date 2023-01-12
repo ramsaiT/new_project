@@ -1,0 +1,26 @@
+kind: training_ml_conf
+operations:
+  a_new_model:
+    file_name: cleaned_data.csv
+    algorithm: logistic_regression
+    input_arguments:
+      target_column: Annual_Income_Over_$50k
+      up_sample: 'false'
+    is_encoded: true
+    columns:
+    - Ageaa
+    - Workclass
+    - Education-Num
+    - Marital Status
+    - Occupation
+    - Relationship
+    - Race
+    - Sex
+    - Capital Gain
+    - Capital Loss
+    - Hours per week
+    - Annual_Income_Over_$50k
+    - Count
+    - Annual_Income
+    vec_meta_data: ''
+    model_type: classification

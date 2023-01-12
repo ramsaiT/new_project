@@ -1,0 +1,274 @@
+kind: data_fetcher_conf
+master_conf_path: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Pipeline Folder/master_conf.yaml
+operations:
+  cl_avaya_loans:
+    filename: cl_avaya_loans.pkl
+    db_connection: SAMIR
+    query:
+      "
+      SELECT
+      	MCID,
+      	ACID acid,
+      	PREDICTED_DELINQUENCY_STATUS,
+      	PROBABILITY_TO_BECOME_DELINQUENT
+      FROM
+      	FLUIDAI.dbo.FLUIDAI_COLLECTIONS_CALLING_LIST_A7_OUTPUT_PREDICTIONS_LOANS_MAR2022_PROBAB_SCORE_BUSINESS;
+      "
+#  cl_avaya_loans_cust_id:
+#    filename: cl_avaya_loans_cust_id.pkl
+#    server: 10.150.78.170:1600
+#    username: FLUIDAIUSER
+#    password: F{UiD@1
+#    database: FLUIDAI
+#    dialect: mssql+pymssql
+#    query:
+#      "
+#      SELECT
+#      	MCID,
+#      	CONVERT (NUMERIC,
+#      	REPLACE(ID_Number,'D','')) cust_id
+#      FROM
+#      	AnalyticOutput.MASTERED_CUSTOMER.CUSTOMER_SYSTEM_IDS
+#      WHERE
+#      	SourceSystem = 'FINACLE'
+#      	AND ID_Type = 'FCID'
+#      	AND MCID IN (?)
+#      "
+#    query_in_parameters:
+#      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_loans.pkl
+#      source_key: MCID
+#      in_query_size: 1000
+#      post_merge_nan_drop: cust_id
+  cl_avaya_loans_dpd_value:
+    filename: cl_avaya_loans_dpd_value.pkl
+    db_connection: George
+    query:
+     " 
+     SELECT * FROM 
+    (SELECT ACID acid, PROD_EIMDW_Archive.dbo.Finacle10_GetDaysPastDue_V2(GETDATE(),gam.ACID,gam.Schm_TYPE,'03')-1 deldays 
+    FROM PROD_EIMDW_Archive.ARCHOWN.FINCL10_GAM GAM
+        WHERE ACID in (?) AND ACTIVE_FLAG='Y') A 
+    where deldays between 1 and 90 "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans.pkl
+      source_key: acid
+      in_query_size: 1000
+  cl_avaya_loans_dpd_interest:
+    filename: cl_avaya_loans_dpd_interest.pkl
+    db_connection: George
+    query:
+      "
+        SELECT
+            X.*
+        FROM
+            (
+            SELECT
+                GAM.ACID acid,
+                GAM.FORACID acctnum,
+                PROD_EIMDW_Archive.dbo.Finacle10_GetCodeDescription(GAM.BANK_ID,'00',GAC.BORROWER_CATEGORY_CODE) cust_type,
+                GAM.CUST_ID actual_cust_id,
+                CAST(REPLACE(GAM.CUST_ID, 'D', '') AS INTEGER) cust_id,
+                cast([PROD_EIMDW_Archive].[dbo].[Finacle10_GetPrincipalOutstanding] ('03', getdate(), GAM.ACID, GAM.SCHM_TYPE) as FLOAT)  prinbalos,
+                [PROD_EIMDW_Archive].[dbo].[Finacle10_GetPrincipalArrears] ('03',GETDATE(),GAM.ACID,GAM.SCHM_TYPE) +
+                [PROD_EIMDW_Archive].[dbo].[Finacle10_GetInterestArrears] ('03',GETDATE(),GAM.ACID,GAM.SCHM_TYPE) arrears,
+                GAM.SOL_ID branchId,
+                GAM.SCHM_TYPE prodtype
+            FROM
+                PROD_EIMDW_Archive.ARCHOWN.FINCL10_GAM GAM
+            JOIN PROD_EIMDW_Archive.ARCHOWN.FINCL10_SOL SOL ON SOL.SOL_ID = GAM.SOL_ID AND SOL.ACTIVE_FLAG='Y'
+            JOIN PROD_EIMDW_Archive.ARCHOWN.FINCL10_GAC GAC ON GAM.ACID = GAC.ACID AND GAC.ACTIVE_FLAG='Y'
+            WHERE
+                SCHM_TYPE IN ('LAA')
+				AND GAM.ACTIVE_FLAG='Y'
+				AND GAC.PD_FLG='N'
+                AND GAM.ACCT_CLS_DATE IS NULL
+                AND GAM.SOL_ID NOT IN (107)
+                AND (GAM.CLR_BAL_AMT + GAM.UN_CLR_BAL_AMT) <0
+                AND GAM.ACID IN (?)
+                )X
+          WHERE
+ X.cust_type != 'PERSONAL'
+        "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_dpd_value.pkl
+      source_key: acid
+      in_query_size: 1000
+      post_merge_nan_drop: deldays
+  cl_avaya_loans_winumber:
+    filename: cl_avaya_loans_winumber.pkl
+    db_connection: George
+    query:
+      "
+      SELECT
+          CI_CUSTOMERID cust_id,
+          WINUMBER,
+          ACCOUNT_NUMBER acctnum
+      FROM
+          PROD_EIMDW_Archive.ARCHOWN.BPM_NCB_COLLECTION_EXTTABLE
+      WHERE
+      	ACCOUNT_NUMBER IN (?)
+      "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_dpd_interest.pkl
+      source_key: acctnum
+      in_query_size: 1000
+  cl_avaya_loans_bal:
+    filename: cl_avaya_loans_bal.pkl
+    db_connection: George
+    query:
+      "
+      SELECT
+          DISTINCT ACID acid,
+          CLR_BAL_AMT as BALANCE,
+          ACCT_CRNCY_CODE AS CURR
+      FROM
+          PROD_EIMDW_Archive.ARCHOWN.FINCL10_GAM
+      WHERE
+      	ACID IN (?)
+      "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_winumber.pkl
+      source_key: acid
+      in_query_size: 1000
+  cl_avaya_loans_lastpay:
+    filename: cl_avaya_loans_lastpay.pkl
+    db_connection: George
+    query:
+      "
+      SELECT
+          FLOW_AMT LASTPAYAMT,
+          LAST_PAY_DATE LASTPAYDT,
+          LDA.ACID acid
+      FROM
+          (
+          SELECT
+              LDA.ACID,
+              SUM(ADJ_AMT) FLOW_AMT,
+              MAX (ADJ_DATE) LAST_PAY_DATE
+          FROM
+              PROD_EIMDW_Archive.ARCHOWN.FINCL10_LDA LDA
+          JOIN PROD_EIMDW_Archive.ARCHOWN.FINCL10_LAM LAM ON
+              LAM.ACID = LDA.ACID
+          WHERE
+              LDA.ACTIVE_FLAG = 'Y'
+              AND LAM.ACTIVE_FLAG = 'Y'
+              AND LDA.ADJ_DATE =(
+              SELECT
+                  MAX(ADJ_DATE)
+              FROM
+                  PROD_EIMDW_Archive.ARCHOWN.FINCL10_LDA LDA2
+              WHERE
+                  LDA.ACID = LDA2.ACID
+                  AND LDA.SHDL_NUM = LDA2.SHDL_NUM
+                  AND LDA2.ACTIVE_FLAG = 'Y'
+                  AND LDA2.DEL_FLG = 'N')
+              AND LDA.DEL_FLG = 'N'
+              AND LAM.DEL_FLG = 'N'
+          GROUP BY
+              LDA.ACID ) LDA
+      WHERE
+          LDA.ACID IN (?)
+      "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_bal.pkl
+      source_key: acid
+      in_query_size: 1000
+  cl_avaya_loans_sol:
+    filename: cl_avaya_loans_sol.pkl
+    db_connection: George
+    query:
+      ' select SOL_ID AS branchId, SOL_DESC AS SOLNAME 
+    FROM [PROD_EIMDW_Archive].[ARCHOWN].[FINCL10_SOL] where ACTIVE_FLAG=''Y'' 
+  and SOL_ID in (?) '
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_lastpay.pkl
+      source_key: branchId
+      in_query_size: 1000
+  cl_avaya_loans_behavioural:
+    filename: cl_avaya_loans_behavioural.pkl
+    db_connection: George
+    query:
+      "
+      SELECT
+          MCID,
+          MODEL_SCORE AS BEHAVIOURALSCORE
+       FROM
+          PROD_EIMDW_Archive.ARCHOWN_CUSTOM_GRMD.GRMD_FINAL_BEH_UN_SCORES
+       WHERE
+       	  MCID IN (?)
+      "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_sol.pkl
+      source_key: MCID
+      in_query_size: 1000
+  cl_avaya_loans_final2:
+    filename: cl_avaya_loans_final2.pkl
+    db_connection: George
+    query:
+        "
+        SELECT
+        PID MCID,
+        RTRIM(LTRIM( CONCAT( COALESCE(First_Name + ' ',
+        '') ,
+        COALESCE(Middle_Name + ' ',
+        '') ,
+        COALESCE(Last_name,
+        '') ) )) AS CUSTNAME,
+        RTRIM(LTRIM( CONCAT( COALESCE(Primary_Street_Address_1 + ', ',
+        '') ,
+        COALESCE(Primary_Street_Address_2 + ', ',
+        '') ,
+        COALESCE(Primary_Street_Addrees_3,
+        '') ) )) AS ADDRESS,
+        Primary_City AS CITY,
+        Primary_Parish AS STATE,
+        Mobile_Phone1 AS PHONE1,
+        Mobile_Phone2 AS PHONE2,
+        Home_Telephone AS PHONE3,
+        Work_Telephone AS PHONE4,
+        Date_Of_Birth AS BIRTHDATE,
+        Occupation AS OCCUPATION
+        FROM
+        PROD_EIMDW_Archive.ARCHOWN.C360_GOLDENCUSTOMER
+        WHERE
+        PID IN (?)
+        "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_behavioural.pkl
+      source_key: MCID
+      in_query_size: 2000
+  cl_avaya_loans_final3:
+    filename: cl_avaya_loans_final3.pkl
+    db_connection: George
+    query:
+      "
+      SELECT
+          PID MCID,
+          PHONE
+      FROM
+          PROD_EIMDW_Staging_EIM.STG.CSTMR_TELEPHONE
+      WHERE
+          PID IN (?)
+      "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_final2.pkl
+      source_key: MCID
+      in_query_size: 1000
+  cl_avaya_loans_final:
+    filename: cl_avaya_loans_final.pkl
+    db_connection: George
+    query:
+      "
+      SELECT
+          CUST_ID actual_cust_id,
+          CUST_NAME CUSTNAME2,
+          DATE_OF_BIRTH BIRTHDATE2
+      FROM
+          PROD_EIMDW_Archive.ARCHOWN.FINCL10_CMG
+      WHERE
+          CUST_ID IN (?)
+      "
+    query_in_parameters:
+      source: /data/Python/project_folder/CL_BUSINESS/CL_BUSINESS_V7/Data Inputs/cl_avaya_loans_final3.pkl
+      source_key: actual_cust_id
+      in_query_size: 1000
