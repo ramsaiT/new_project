@@ -1,0 +1,3 @@
+kind: master_pipeline_runner_conf
+master_conf_path: Z:\NCB_project_folder\PROJECT2\PROJECT2_V5\Pipeline Folder\master_conf.yaml
+flow: {}
