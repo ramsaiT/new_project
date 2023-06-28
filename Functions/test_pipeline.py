@@ -105,3 +105,4 @@ def pipeline(master_conf, cleaned_data, output_name, output_format):
     cleaned_data = cleaned_data.iloc[:100]
     cleaned_data.to_csv(os.path.join(output_path, output_name + output_format), index=False)
     cleaned_data.to_csv(os.path.join(output_path, output_name + current_datetime + output_format), index=False)
+    print(current_datetime)
