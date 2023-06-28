@@ -99,7 +99,8 @@ def pipeline(master_conf, cleaned_data, output_name, output_format):
                                                                                                        "-").replace(
         ":", "_")
 
-	
+
+    print(current_datetime)
     # examples to save data into Data Inputs
     cleaned_data = cleaned_data.iloc[:100]
     cleaned_data.to_csv(os.path.join(output_path, output_name + output_format), index=False)
