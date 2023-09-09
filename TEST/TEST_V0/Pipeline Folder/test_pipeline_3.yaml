@@ -1,0 +1,8 @@
+kind: custom_pipeline_conf
+data_inputs:
+  cleaned_data:
+    filename: cleaned_data.csv
+function: test_pipeline_3
+outputs:
+  name: test_pipeline_3
+  format: .csv
