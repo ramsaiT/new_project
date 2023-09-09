@@ -1,0 +1,8 @@
+kind: custom_pipeline_conf
+data_inputs:
+  customer_pid_data:
+    filename: customer_pid_data.csv
+function: check_customer_eligibility
+outputs:
+  name: customer_eligibility_details
+  format: .csv
