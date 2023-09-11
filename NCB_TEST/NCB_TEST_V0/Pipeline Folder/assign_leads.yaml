@@ -1,0 +1,8 @@
+kind: custom_pipeline_conf
+data_inputs:
+  customer_details:
+    filename: lead_creation_kyc_data.csv
+function: assign_leads
+outputs:
+  name: customer_details_with_leads
+  format: .csv
