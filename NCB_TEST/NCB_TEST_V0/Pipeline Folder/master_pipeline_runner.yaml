@@ -1,0 +1,4 @@
+kind: master_pipeline_runner_conf
+master_conf_path: /home/fluidai/Desktop/test_project_folder/TEST/TEST_V0/Pipeline
+  Folder/master_conf.yaml
+flow: {}
